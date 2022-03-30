@@ -1,0 +1,8 @@
+*.swp
+.DS_Store
+*.png
+*.jpg
+*.jpeg
+*.txt
+__pycache__
+*.pyc
