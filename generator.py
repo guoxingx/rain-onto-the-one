@@ -5,19 +5,7 @@ import numpy as np
 from cv2 import cv2 as cv
 
 from utils import log
-
-
-# shadow dir
-IMAGES_DIR = "images"
-
-# raw txt filename for storage
-RAW_DATA_PATH = "raw.txt"
-
-# size of shadow
-SIZE = (60, 60)
-
-# pixels size
-PIXELS = (1080, 1080)
+from params import IMAGES_DIR, RAW_DATA_PATH, SIZE, PIXELS
 
 
 def encode(nd):
@@ -34,7 +22,7 @@ def encode(nd):
     return enc
 
 
-def decode(array, size=SIZE):
+def decode(array, size=SIZE, bio=True):
     """
     decode a nd array from raw data
     """
@@ -47,8 +35,33 @@ def decode(array, size=SIZE):
         for j_number in range(bin_str_length):
             j = j_number + col_length - bin_str_length
             if int(bin_str[j_number]) != 0:
-                nd[i, j] = 1
+                if bio:
+                    nd[i, j] = 1
+                else:
+                    nd[i, j] = 255
     return nd
+
+
+def load_image(filepath, size=SIZE):
+    """
+    load raw from existed image
+    """
+    image = cv.imread(filepath, 0)
+    size_image = (image.shape[0], image.shape[1])
+
+    if size_image == size:
+        return cv.threshold(image, 127, 255, cv.THRESH_BINARY)
+
+    a = int(size_image[0] / size[0])
+    b = int(size_image[1] / size[1])
+
+    res = np.zeros(size)
+    for i, row in enumerate(res):
+        for j, col in enumerate(row):
+            if image[i*a, j*b] > 127:
+                res[i, j] = 255
+    return res
+
 
 
 def image_from_ndarray(nd, pixels=PIXELS):
@@ -68,22 +81,23 @@ def image_from_ndarray(nd, pixels=PIXELS):
     return image
 
 
-def load_raw():
+def load_raw(filename=None, size=SIZE, bio=True):
     """
     load raw data from existed file
     """
-    filename = raw_data_required()
     if filename == None:
-        nds = generate_raw()
-        save_raw()
-        return nds
+        filename = raw_data_required()
+        if filename == None:
+            nds = generate_raw()
+            save_raw_list()
+            return nds
 
 
     f = open(filename, 'r')
     nds = []
     for index, line in enumerate(f.readlines()):
         array = json.loads(line)
-        dec = decode(array)
+        dec = decode(array, size=size, bio=bio)
         nds.append(dec)
 
         if index % 1000 == 0:
@@ -93,11 +107,12 @@ def load_raw():
     return nds
 
 
-def save_raw(nds):
+def save_raw_list(nds, filename=None):
     """
     save nd array into raw data
     """
-    filename = save_raw_data_confirmed()
+    if filename == None:
+        filename = save_raw_data_confirmed()
     log("raw data will be save as {}".format(filename))
 
     f = open(filename, 'a+')
