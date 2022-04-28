@@ -63,7 +63,6 @@ def load_image(filepath, size=SIZE):
     return res
 
 
-
 def image_from_ndarray(nd, pixels=PIXELS):
     """
     generate an image nd array in given pixels from raw data
@@ -89,7 +88,7 @@ def load_raw(filename=None, size=SIZE, bio=True):
         filename = raw_data_required()
         if filename == None:
             nds = generate_raw()
-            save_raw_list()
+            save_raw_list(nds)
             return nds
 
 
@@ -128,11 +127,12 @@ def save_raw_list(nds, filename=None):
     log("raw data with count {} saved into file: {}".format(len(nds), filename))
 
 
-def generate_raw(pixels=PIXELS):
+def generate_raw(size=None):
     """
     generate raw data
     """
-    size = generate_raw_data_confirmed()
+    if size == None:
+        size = generate_raw_data_confirmed()
     count = size[0] * size[1] * 2
     log("raw data with size {} and count {} will be generated.".format(size, count))
 
@@ -222,18 +222,18 @@ def raw_data_required():
 
 
 def generate_raw_data_confirmed():
-    size = input(
+    inpt = input(
         """
         type in the size for shadow (default: 60):
 
         """
     )
 
-    if len(size) == 0:
+    if len(inpt) == 0:
         return SIZE
 
     try:
-        size = int(mode_str)
+        size = int(inpt)
         return (size, size)
     except Exception as e:
         log("invalid input")
@@ -266,6 +266,16 @@ def save_images_confirmed():
     return path
 
 
+def dir_required():
+    inpt = input(
+        """
+        images dir:
+
+        """
+    )
+    return inpt
+
+
 if __name__ == "__main__":
     mode = mode_required()
 
@@ -274,3 +284,10 @@ if __name__ == "__main__":
 
     if mode == 2:
         generate_raw()
+
+    if mode == 3:
+        d = dir_required()
+        rs = []
+        for i in range(7200):
+            raw = load_image("{}/p_{}.png".format(d, i+1))
+            rs.append(d)
