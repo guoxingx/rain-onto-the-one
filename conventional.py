@@ -46,11 +46,12 @@ def conventional(bucket_list, reference_list, size):
 
 if __name__ == "__main__":
     size = SIZE
+    filedir = "0331_SCU_60"
 
-    bucket_list = get_bucket_power_from_file("0331_SCU_60/output.txt")
+    bucket_list = get_bucket_power_from_file("{}/output.txt".format(filedir))
     bucket_list = bucket_list[:3600]
     reference_list = load_raw("raw60.txt", size=size, bio=False)
     reference_list = reference_list[:3600]
 
     gi = conventional(bucket_list, reference_list, size)
-    cv.imwrite("{}/convential.png".format(STATICS_DIR), gi)
+    cv.imwrite("{}/convential.png".format(filedir), gi)

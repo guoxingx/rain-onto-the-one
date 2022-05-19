@@ -80,7 +80,7 @@ def image_from_ndarray(nd, pixels=PIXELS):
     return image
 
 
-def load_raw(filename=None, size=SIZE, bio=True):
+def load_raw(filename=None, size=SIZE, bio=True, N=None):
     """
     load raw data from existed file
     """
@@ -95,6 +95,8 @@ def load_raw(filename=None, size=SIZE, bio=True):
     f = open(filename, 'r')
     nds = []
     for index, line in enumerate(f.readlines()):
+        if N != None and N > 0 and index >= N:
+            break
         array = json.loads(line)
         dec = decode(array, size=size, bio=bio)
         nds.append(dec)
