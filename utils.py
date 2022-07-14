@@ -6,6 +6,7 @@ from datetime import datetime
 import numpy as np
 from cv2 import cv2 as cv
 import scipy.fftpack as spfft
+import scipy.ndimage as spimg
 
 
 def log(s):
@@ -27,14 +28,14 @@ def dct_matrix(N):
 def dct_1d_matrix(M):
     """
     for k = 1:m
-    for n = 1:m
-             Phi(k,n) = cos((2*n-1)*(k-1)*pi/(2*m));
-    end
-    if k==1
-             Phi(k,:) = sqrt(1/m).*Phi(k,:);
-    else
+        for n = 1:m
+            Phi(k,n) = cos((2*n-1)*(k-1)*pi/(2*m));
+        end
+        if k==1
+            Phi(k,:) = sqrt(1/m).*Phi(k,:);
+        else
             Phi(k,:) = sqrt(2./m).*Phi(k,:);
-    end
+        end
     end
     """
     psi = np.zeros((M, M))
@@ -139,3 +140,19 @@ def dct2(x):
 
 def idct2(x):
     return spfft.idct(spfft.idct(x.T, norm='ortho', axis=0).T, norm='ortho', axis=0)
+
+
+def compress_image(x, scale):
+    """
+    grayscale only
+    """
+    return spimg.zoom(x, scale)
+
+
+def normalize(arr, maxi=None, mini=None):
+    maxi = maxi or max(arr)
+    mini = mini or min(arr)
+    diff = maxi - mini
+    if diff == 0:
+        return [1 for i in arr]
+    return [(v-mini)/diff for v in arr]

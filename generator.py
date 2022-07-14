@@ -42,7 +42,7 @@ def decode(array, size=SIZE, bio=True):
     return nd
 
 
-def load_image(filepath, size=SIZE):
+def raw_from_image(filepath, size=SIZE):
     """
     load raw from existed image
     """
@@ -69,6 +69,8 @@ def image_from_ndarray(nd, pixels=PIXELS):
     """
     rate_row = int(pixels[0] / nd.shape[0])
     rate_col = int(pixels[1] / nd.shape[1])
+
+    pixels = (rate_row * nd.shape[0], rate_col * nd.shape[1])
 
     image = np.zeros(pixels)
     for i in range(nd.shape[0]):
@@ -146,11 +148,11 @@ def generate_raw(size=None):
     return nds
 
 
-def generate_images():
+def generate_images(filename=None, size=SIZE):
     """
     generate images with raw data
     """
-    nds = load_raw()
+    nds = load_raw(filename, size=size)
 
     dir_path = save_images_confirmed()
     if dir_path == None:
@@ -170,6 +172,7 @@ def mode_required():
         chose the function to run:
             1. Generate images. (default)
             2. Generate raw data.
+            3. Save raw from images
 
         """
     )
@@ -290,6 +293,9 @@ if __name__ == "__main__":
     if mode == 3:
         d = dir_required()
         rs = []
-        for i in range(7200):
-            raw = load_image("{}/p_{}.png".format(d, i+1))
-            rs.append(d)
+        for i in range(3200):
+            raw = raw_from_image("{}/p_{}.jpg".format(d, i+1), (40,40))
+            if i % 100 == 0:
+                print("load raw: {}".format(i))
+            rs.append(raw)
+        save_raw_list(rs, "raw40.txt")

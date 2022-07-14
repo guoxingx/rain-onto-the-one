@@ -16,8 +16,8 @@ import scipy.fftpack as spfft
 import matplotlib.pyplot as plt
 from pylbfgs import owlqn
 
-
 from utils import idct2
+
 
 def evaluate(x, g, step):
     """An in-memory evaluation callback."""

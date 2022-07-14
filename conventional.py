@@ -2,9 +2,9 @@
 import numpy as np
 from cv2 import cv2 as cv
 
-from utils import get_bucket_power_from_file, log
+from utils import get_bucket_power_from_file, log, normalize
 from params import STATICS_DIR, SIZE, IMAGES_DIR
-from generator import load_raw, load_image, save_raw_list
+from generator import load_raw, save_raw_list
 
 
 def conventional(bucket_list, reference_list, size):
@@ -17,7 +17,8 @@ def conventional(bucket_list, reference_list, size):
     """
 
     if len(bucket_list) != len(reference_list):
-        raise ValueError("bucket counts must be equal to reference counts")
+        raise ValueError("bucket counts must be equal to reference counts, bucket: {}, reference: {}"
+               .format(len(bucket_list), len(reference_list)))
     times = len(bucket_list)
 
     correlate_sum = np.zeros(size)
@@ -40,18 +41,19 @@ def conventional(bucket_list, reference_list, size):
     mi = np.min(gi)
     mx = np.max(gi)
     gi = 255 * (gi - mi) / (mx - mi)
-    log("gi is {}".format(gi))
+    # log("gi is {}".format(gi))
     return gi
 
 
 if __name__ == "__main__":
-    size = SIZE
-    filedir = "0331_SCU_60"
+    size = (40, 40)
+    filedir = "data/0608_23_D_1_M4"
 
-    bucket_list = get_bucket_power_from_file("{}/output.txt".format(filedir))
-    bucket_list = bucket_list[:3600]
-    reference_list = load_raw("raw60.txt", size=size, bio=False)
-    reference_list = reference_list[:3600]
+    b_list = get_bucket_power_from_file("{}/output.txt".format(filedir))
+    r_list = load_raw("raw40.txt", size=size, bio=False)
+
+    bucket_list, reference_list = b_list[:], r_list[:]
+    bucket_list = normalize(bucket_list)
 
     gi = conventional(bucket_list, reference_list, size)
     cv.imwrite("{}/convential.png".format(filedir), gi)

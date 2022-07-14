@@ -24,6 +24,7 @@ import scipy.fftpack as spfft
 import matplotlib.pyplot as plt
 import scipy.fftpack as spfft
 from cv2 import cv2 as cv
+from scipy.linalg import hadamard
 
 import utils
 
@@ -39,59 +40,64 @@ def omp(A, y, K):
     M = A.shape[0]
     N = A.shape[1]
 
-    # 存储恢复的列向量
-    theta = np.zeros((N, 1))
-
-    # 存储迭代过程中A被选择的列 和 列序号
+    # 用来存储 迭代过程中A被选择的 列 和 列序号
     Ac = np.zeros((M, 0))
+
+    # 用来存储最终稀疏基所在的 列序号
     index = []
 
     # 残差，初始化为y [M, 1]
     r = y
+
+    # 循环K次，每次找到一个稀疏列
     for i in range(K):
-        # 1. 找到r和A列积最大值的对应位置
+        # 1. 找到残差r和A列积最大值的对应位置
         product = np.fabs(A.T.dot(r))
-        # pos = product.argmax()
-        pos = product.sum(1).argmax()
-        # print("shape: {}, loop: {}, pos: {}".format(product.shape, i, pos))
+        pos = product.argmax()
+        # product = np.fabs(A.T.dot(r)) / np.fabs(A.T.sum(1))
+        # pos = product.sum(1).argmax()
 
         # 将A逐列赋值给Ac，True表示以矩阵形式
         Ac = np.column_stack((Ac, A[:,pos,True]))
         index.append(pos)
 
         # 清零A的对应列
-        # A[:,pos] = np.zeros(M)
+        A[:,pos] = np.zeros(M)
 
         # 最小二乘解 x = [ (AT * A) ^ -1 ] * AT * y
-        tmp = np.linalg.pinv(Ac.T.dot(Ac))
-        ls = tmp.dot(Ac.T).dot(y)
+        ls = np.linalg.pinv(Ac.T.dot(Ac)).dot(Ac.T).dot(y)
+
+        # 更新残差
         r = y - Ac.dot(ls)
 
+    # 存储恢复的列向量
+    theta = np.zeros((N, 1))
     for i, pos in enumerate(index):
         theta[pos] = ls[i]
     return theta
 
 
 def mock_restruct_1d():
-    M = 64
+    M = 45
     N = 256
-    K = 20
+    K = 16
 
-    # # 一维信号 [N, 1]
-    # x = np.zeros((N, 1))
+    # 一维信号 [N, 1]
+    x = np.zeros((N, 1))
 
-    # # 稀疏信号随机模拟
-    # Index_K = np.random.choice(N, K, replace=False)
-    # x.flat[Index_K] = np.random.randn(K) * 10
+    # 稀疏信号随机模拟
+    Index_K = np.random.choice(N, K, replace=False)
+    x.flat[Index_K] = np.random.randn(K) * 10
 
-    x = np.random.rand(N, 1)
+    # x = np.random.rand(N, 1)
 
     # 观测矩阵 [M, N]
     phi = np.random.randn(M, N)
+    # phi = hadamard(256)[np.random.choice(N, M, replace=False)]
 
     # 稀疏基矩阵 [N, N]
-    # psi = np.eye(N)
-    psi = utils.dct_1d_matrix(N)
+    psi = np.eye(N)
+    # psi = utils.dct_1d_matrix(N)
     # psi = cv.idct(np.eye(N))
     # psi = cv.idct(np.eye(N)) / np.sqrt(N)
     # psi = cv.dct(np.eye(N))
@@ -124,9 +130,13 @@ def mock_restruct_1d():
     #         print(i, k[0])
 
     plt.plot(x)
+
+    marks = []
     for i, v in enumerate(xr):
         if abs(v) > 0.1:
-            plt.scatter(i, v)
+            marks.append(i)
+    plt.plot(xr, markevery=marks, ls="", marker="*")
+
     plt.show()
 
 
@@ -160,7 +170,7 @@ def mock_restruct_image_1d():
     # plt.show()
 
 
-def mock_restruct_image():
+def mock_restruct_image_byline():
     M = 127
     N = 378
     K = 30
@@ -198,7 +208,7 @@ def mock_restruct_image():
 
 
 def test():
-    N = 40
+    N = 10
     psi = utils.dct_1d_matrix(N)
     psi2 = utils.dct_2d_matrix(N, N)
     dct = utils.dct_matrix(N)
@@ -207,7 +217,7 @@ def test():
     # print(psi.dot(a).dot(psi.T))
     # print(cv.dct(a))
 
-    b = np.array([15,12,14,17]).astype(float)
+    # b = np.array([15,12,14,17]).astype(float)
     b = np.random.rand(N, 1)
     print(b)
     print(psi.dot(b))
@@ -217,8 +227,27 @@ def test():
     # plt.show()
 
 
+def test_omp2():
+    N = 20 # dimension of the unknown vector w
+    k = 3 # assume w is k-sparse
+    x = np.zeros(N)
+    rgn = np.random.RandomState(0)
+
+    # randomly choose k entries, and randomly assign values
+    x[rgn.randint(0,N,k)] = rgn.normal(loc=0.0,scale=1.0,size=k)
+
+    M = 20 # dimension of the sensing matrix
+    A = rgn.normal(loc=0.0,scale=1.0,size=(M,N))
+    y = A.dot(x)
+
+    print(y.shape, A.shape)
+    theta = omp2(A, y)
+    print(y)
+    print(theta)
+
+
 if __name__ == "__main__":
     # test()
-    # mock_restruct_1d()
+    mock_restruct_1d()
     # mock_restruct_image_1d()
-    mock_restruct_image()
+    # mock_restruct_image_byline()
