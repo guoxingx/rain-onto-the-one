@@ -19,22 +19,28 @@ def multi():
     b_list = get_bucket_power_from_file("{}/output.txt".format(filedir))
     if len(b_list) <= 1024:
         size = (32, 32)
-        r_list = load_raw("raw32.txt", size=size, bio=False)
+        r_list = load_raw("raw_h32.txt", size=size, bio=False)
     elif len(b_list) <= 3200:
         size = (40, 40)
-        r_list = load_raw("raw40.txt", size=size, bio=False)
-    else:
+        r_list = load_raw("raw_r40.txt", size=size, bio=False)
+    elif len(b_list) <= 4096:
+        size = (64, 64)
+        r_list = load_raw("raw_h64.txt", size=size, bio=False)
+    elif len(b_list) <= 7200:
         size = (60, 60)
-        r_list = load_raw("raw60.txt", size=size, bio=False)
+        r_list = load_raw("raw_r60.txt", size=size, bio=False)
+    else:
+        size = (128, 128)
+        r_list = load_raw("raw_h128.txt", size=size, bio=False)
 
     bucket_list, reference_list = b_list[:], r_list[:]
     bucket_list = normalize(bucket_list)
 
     gi = conventional(bucket_list, reference_list, size)
-    cv.imwrite("{}/convential_nor.png".format(filedir), gi)
+    cv.imwrite("{}/convential.png".format(filedir), gi)
 
     dgi = differential(bucket_list, reference_list, size)
-    cv.imwrite("{}/differential.png".format(filedir), gi)
+    cv.imwrite("{}/differential.png".format(filedir), dgi)
 
     plt.title("功率计响应点 亮光环境")
 
@@ -54,16 +60,16 @@ def multi():
 
 
 def mode_required():
-    print("鬼像数据采集v2.0")
+    print("鬼像数据提取v2.0")
     print("选择要执行的功能:")
-    print("    1 - 快速处理(默认)")
-    print("    2 - 数据提取")
-    print("    3 - 散斑图投影")
+    print("    1 - 快速模式")
+    print("    2 - 文件夹模式(默认)")
+    print("    3 - 详细模式")
     print("    4 - 图像重构")
     mode = input("输入 选项: ")
 
     if mode == "":
-        mode = 1
+        mode = 2
     else:
         mode = int(mode)
     return mode

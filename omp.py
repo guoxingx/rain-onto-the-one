@@ -78,7 +78,7 @@ def omp(A, y, K):
 
 
 def mock_restruct_1d():
-    M = 45
+    M = 64
     N = 256
     K = 16
 

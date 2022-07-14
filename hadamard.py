@@ -17,16 +17,13 @@ from scipy.linalg import hadamard
 from generator import save_raw_list, load_raw, generate_images
 
 
-def generate_speckle(n_speckle=32, disorder=False):
+def generate_speckle(n_speckle=32, index=None):
     n = n_speckle**2
     h = hadamard(n)
     h = (h + 1) / 2
 
-    if disorder:
-        index = np.random.choice(n, n, replace=False)
+    if index:
         h = h[index]
-
-    h = h * 255
 
     nds = []
     for row in h:
@@ -34,22 +31,20 @@ def generate_speckle(n_speckle=32, disorder=False):
     return nds
 
 
-def save_speckle(nds):
-    n = nds[0].shape[0]
-    filename = "raw{}.txt".format(n)
+def save_speckle(n_speckle, index=None):
+    """
+    """
+    filename = "raw_h{}.txt".format(n_speckle)
 
-    save_raw_list(nds, filename)
-    print(nds[0])
+    save_raw_list(None, filename, hadamard=index if index is not None else n_speckle)
 
-    nds = load_raw(filename, (n, n))
-    print(nds[0])
-
-    generate_images(filename, (n, n))
+    generate_images(filename, (n_speckle, n_speckle))
 
 
 def main():
-    # generate_speckle()
-    save_speckle(generate_speckle(128))
+    n = 64
+    # save_speckle(n, index=np.random.choice(n, n, replace=False).tolist())
+    save_speckle(n)
 
 
 if __name__ == "__main__":

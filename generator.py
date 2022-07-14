@@ -93,9 +93,17 @@ def load_raw(filename=None, size=SIZE, bio=True, N=None):
             save_raw_list(nds)
             return nds
 
+    if "raw_h" in filename:
+        from hadamard import generate_speckle
+        n, index = int(filename[5:-4]), None
+        f = open(filename, 'r')
+        for i, line in enumerate(f.readlines()):
+            if len(line) > 2:
+                index = json.loads(line)
+        return generate_speckle(n, index)
 
-    f = open(filename, 'r')
     nds = []
+    f = open(filename, 'r')
     for index, line in enumerate(f.readlines()):
         if N != None and N > 0 and index >= N:
             break
@@ -110,15 +118,26 @@ def load_raw(filename=None, size=SIZE, bio=True, N=None):
     return nds
 
 
-def save_raw_list(nds, filename=None):
+def save_raw_list(nds, filename=None, hadamard=None):
     """
     save nd array into raw data
+    
+    如果是哈达玛矩阵，传入参数hadamard=矩阵行序号 即可
     """
     if filename == None:
         filename = save_raw_data_confirmed()
     log("raw data will be save as {}".format(filename))
 
     f = open(filename, 'a+')
+
+    if hadamard is not None:
+        if type(hadamard) == int:
+            log("save raw hadamard H({})".format(hadamard))
+        else:
+            f.write(str(hadamard))
+            log("save raw hadamard H({}), with index: {}".format(len(hadamard), hadamard))
+        return
+
     for index, nd in enumerate(nds):
         enc = encode(nd)
         f.write(str(enc))

@@ -17,6 +17,8 @@ from datetime import datetime
 from http.server import HTTPServer, SimpleHTTPRequestHandler, BaseHTTPRequestHandler
 
 
+Verbose = False
+
 # 积分时间，每次采样会先跳过这段时间，再开始采集数据
 INTERGRATION_TIME = 1.5
 
@@ -26,64 +28,24 @@ SAMPLING_TIME = 0.5
 # 允许误差，超过这个值视为不同数据 (0~1)
 ALLOW_ERROR = 0.1
 
-# 输出结果的文件名
-PM_DIR = "."
+# 功率计文件目录
+PM_DIR = "../../Documents/StarLab"
+
+# 时间信号目录
+SIGNAL_DIR = "."
+# 时间信号文件名
 SIGNAL_FILE = "signals.txt"
+
+# 输出文件名称
 OUTPUT_FILENAME = "output.txt"
 
-PMActiveTs = None # activate timestamp of power meter
-
-Prev = None
-
 
 def ts2time(ts):
+    """
+    timestamp to 23:51:16.515000
+    """
     return datetime.fromtimestamp(ts).strftime("%H:%M:%S.%f")
 
-
-class Sampling(object):
-    def __init__(self):
-        self.begin = 0
-        self.end = 0
-
-        self.valid_begin = 0
-        self.valid_end = 0
-
-        self.ts_begin = 0
-        self.ts_end = 0
-
-        self.values = []
-        self.valid_values = []
-        self.avg = 0
-
-    def is_stable(self, f):
-        if len(self.values) == 0:
-            return False
-
-        last = self.values[-1]
-        if f == 0 and last == 0:
-            return True
-
-        err1 = 0
-        if last == 0:
-            err1 = abs((last - f) / f)
-        else:
-            err1 = abs((last - f) / last)
-
-        if err1 > ALLOW_ERROR:
-            return False
-        return True
-
-        # if len(self.values) == 0:
-        #     return False
-
-        # err = abs(self.values[-1] - f)
-        # if err / self.values[-1] > ALLOW_ERROR:
-        #     return False
-        # return True
-
-
-def ts2time(ts):
-    return datetime.fromtimestamp(ts).strftime("%H:%M:%S.%f")
 
 
 def sampling(ts, pm_output_file, index):
@@ -106,203 +68,70 @@ def filename_required(default=None, note=None):
     return name
 
 
-def empty_samping(ts, pm_output_file):
-    """
-    ;First Pulse Arrived : 06/03/2022 at 11:24:59
-    """
-    cs = Sampling()
-    cs.begin = 0
-
-    cs.ts_begin = ts + INTERGRATION_TIME
-    cs.ts_end = ts + INTERGRATION_TIME + SAMPLING_TIME
-    # log("collect data between {} ~ {}".format(ts2time(cs.ts_begin), ts2time(cs.ts_end)))
-
-    f = open(pm_output_file, 'r')
-
-    begin = False
-    for i, line in enumerate(f.readlines()):
-        if "First Pulse Arrived" in line:
-            # record the activate of pm
-            parts = line.split("Arrived :")
-            tStr = parts[1]
-            parts = tStr.split("at")
-
-            dateStr = parts[0]
-            timeStr = parts[1]
-            dateStr = dateStr.strip()
-            timeStr = timeStr.strip()
-            t = datetime.strptime("{} {}".format(dateStr, timeStr), "%d/%m/%Y %H:%M:%S")
-
-            ts = time.mktime(t.timetuple())
-            # log("find activate time is {}, time: {}, line: {}".format(t, ts2time(ts), i))
-
-            global PMActiveTs
-            PMActiveTs = ts
-            continue
-
-        if "Timestamp" in line:
-            # log("find the beginning of data, line: {}".format(i))
-            begin = True
-            continue
-
-        if not begin:
-            continue
-
-        s = line.strip()
-        parts = s.split(" ")
-
-        d, value = parts[0], parts[-1]
-        try:
-            d = float(d)
-            value = float(value)
-        except Exception as e:
-            log("failed to convert interval: {}".format(e))
-            log("line {}: {} into {}".format(i, line, parts))
-
-        if d + PMActiveTs < cs.ts_begin:
-            # only record after INTERGRATION_TIME
-            continue
-
-        if d + PMActiveTs > cs.ts_end:
-            # log("out of range of time, loop will be finished")
-            break
-
-        # log("[valid] value: {}, line: {}, time: {}".format(value, i, ts2time(d + PMActiveTs)))
-        # record the first and the last line
-        if cs.begin == 0:
-            cs.begin = i
-        if i > cs.end:
-            cs.end = i
-
-        cs.values.append(value)
-
-        # only recorded when value is stabled
-        if cs.is_stable(value):
-            cs.valid_values.append(value)
-            if cs.valid_begin == 0:
-                cs.valid_begin = i
-            cs.valid_end = i
-
-    # log("finish loop, ended in line {}".format(i))
-    if len(cs.valid_values) == 0:
-        log("no valid values found!")
-        log("all values: {}".format(cs.values))
-        f.close()
-
+def extract(pm, ts_list):
+    f = open(pm, 'r')
+    lines = f.readlines()
     f.close()
 
-    if len(cs.valid_values) == 0:
-        log("falied to load valid value, 0 will be write into output file")
-        cs.avg = 0
-    else:
-        cs.avg = sum([v for v in cs.valid_values]) / len(cs.valid_values)
-        # log("valid line {} to {}, recorded line from {} to {}".format(cs.valid_begin, cs.valid_end, cs.begin, cs.end))
-        # log("avg: {}, count: {}, valid_values: {}\n".format(cs.avg, len(cs.valid_values), cs.valid_values))
+    # 获取功率计起始时间
+    pm_active_line = lines[31]
+    parts = pm_active_line.split("Arrived :")
+    tStr = parts[1]
+    parts = tStr.split("at")
+    dateStr = parts[0].strip()
+    timeStr = parts[1].strip()
+    t = datetime.strptime("{} {}".format(dateStr, timeStr), "%d/%m/%Y %H:%M:%S")
+    pm_active_ts = time.mktime(t.timetuple())
+    info("功率计起始时间: {}".format(ts2time(pm_active_ts)))
 
-    f = open(OUTPUT_FILENAME, 'a+')
-    f.write("\n")
-    f.write("[采集结果] 开始时间：{}\n".format(datetime.fromtimestamp(ts)))
-    f.close()
+    # 清楚功率计文件初始信息
+    lines = lines[33:]
 
-    global Prev
-    Prev = cs
+    # 循环的当前坐标
+    current_line, res = 0, []
+    for i, ts in enumerate(ts_list):
+        lines = lines[current_line:]
 
-    return cs.avg
+        begin_ts = ts + INTERGRATION_TIME
+        end_ts = begin_ts + SAMPLING_TIME
 
+        if i % 100 == 0:
+            info("extraction, index: {}".format(i))
+        else:
+            debug("extraction, index: {}".format(i))
+        debug("collect data between {} ~ {}".format(ts2time(begin_ts), ts2time(end_ts)))
 
-def sampling_from_powermeter(pm_output_file, prev):
-    global Prev
-    if Prev == None:
-        log("first sampling")
-        return empty_samping(ts, pm_output_file)
+        update_line, values = 0, []
+        for j, line in enumerate(lines):
+            s = line.strip()
+            parts = s.split(" ")
 
-    # record timestamp in the begining
-    cs = Sampling()
-    cs.ts_begin = time.time()
-    cs.end = Prev.end
+            d, value = parts[0], parts[-1]
+            try:
+                d = float(d)
+                value = float(value)
+            except Exception as e:
+                error("failed to convert interval: {}".format(e))
+                error("line {}: {} into {}".format(i, line, parts))
 
-    cs.ts_begin = ts + INTERGRATION_TIME
-    cs.ts_end = ts + INTERGRATION_TIME + SAMPLING_TIME
-    # log("collect data between time {} ~ {}".format(ts2time(cs.ts_begin), ts2time(cs.ts_end)))
+            if d + pm_active_ts < begin_ts:
+                # only record after INTERGRATION_TIME
+                continue
 
-    # time.sleep(INTERGRATION_TIME + SAMPLING_TIME)
+            if d + pm_active_ts > end_ts:
+                debug("out of range of time, loop will be finished")
+                update_line = j
+                break
+            values.append(value)
 
-    f = open(pm_output_file, 'r')
-
-    # log("line before {} will be skiped".format(Prev.end))
-    for i, line in enumerate(f.readlines()):
-        if i < Prev.end:
-            continue
-
-        s = line.strip()
-        parts = s.split(" ")
-
-        d, value = parts[0], parts[-1]
-        try:
-            d = float(d)
-            value = float(value)
-        except Exception as e:
-            log("failed to convert interval: {}".format(e))
-            log("line {}: {} into {}".format(i, line, parts))
-
-        if d + PMActiveTs < cs.ts_begin:
-            # only record after INTERGRATION_TIME
-            continue
-
-        if d + PMActiveTs > cs.ts_end:
-            # log("out of range of time, loop will be finished")
-            break
-
-        # record the first and the last line
-        if cs.begin == 0:
-            cs.begin = i
-        if i > cs.end:
-            cs.end = i
-
-        # log("[valid] value: {}, line: {}, time: {}".format(value, i, ts2time(d + PMActiveTs)))
-        cs.values.append(value)
-
-        # only recorded when value is stabled
-        if cs.is_stable(value):
-            cs.valid_values.append(value)
-            if cs.valid_begin == 0:
-                cs.valid_begin = i
-            cs.valid_end = i
-
-    # log("finish loop, ended in line {}".format(i))
-    if len(cs.valid_values) == 0:
-        log("no valid values found!")
-        log("all values: {}".format(cs.values))
-        f.close()
-
-    f.close()
-
-    if len(cs.valid_values) == 0:
-        log("falied to load valid value, 0 will be write into output file")
-        cs.avg = 0
-    else:
-        cs.avg = sum([v for v in cs.valid_values]) / len(cs.valid_values)
-        # log("valid line {} to {}, recorded line from {} to {}".format(cs.valid_begin, cs.valid_end, cs.begin, cs.end))
-        # log("avg: {}, count: {}, valid_values: {}\n".format(cs.avg, len(cs.valid_values), cs.valid_values))
-
-    Prev = None
-    Prev = cs
-    return cs.avg
-
-
-def mode_required():
-    print("鬼像数据采集v1.0")
-    print("选择要执行的功能:")
-    print("    1 - 数据提取-快速模式(默认)")
-    print("    2 - 数据提取")
-    print("    3 - 散斑图投影")
-    mode = input("输入 选项: ")
-
-    if mode == "":
-        mode = 1
-    else:
-        mode = int(mode)
-    return mode
+        current_line = update_line
+        if len(values) == 0:
+            error("falied to load valid value, 0 will be write into output file")
+            avg = 0
+        else:
+            avg = sum([v for v in values]) / len(values)
+        res.append(avg)
+    return res
 
 
 def ts_from_recorded_signals(signalfile):
@@ -323,43 +152,101 @@ def log(s):
     print("{}: {}".format(now, s))
 
 
+def error(s):
+    print("[ERROR] {}: {}".format(datetime.now(), s))
+
+
+def info(s):
+    print("[INFO] {}: {}".format(datetime.now(), s))
+
+
+def debug(s):
+    if Verbose:
+        print("[DEBUG] {}: {}".format(datetime.now(), s))
+
+
+def mode_required():
+    print("鬼像数据提取v1.0")
+    print("选择要执行的功能:")
+    print("    1 - 快速模式")
+    print("    2 - 文件夹模式(默认)")
+    print("    3 - 详细模式")
+    mode = input("输入 选项: ")
+
+    if mode == "":
+        mode = 2
+    else:
+        mode = int(mode)
+    return mode
+
+
 def run(mode):
     if mode == 1:
+        files = os.listdir(PM_DIR)
+        files = sorted(files, key=lambda f: os.path.getmtime(os.path.join(PM_DIR, f)))
+        pms = [f for f in files if "signals" not in f and "output" not in f and "txt" in f]
+        if len(pms) == 0:
+            print("没有找到功率计文件！")
+            print(PM_DIR, files)
+            time.sleep(3)
+            return
+
+        files = os.listdir(SIGNAL_DIR)
+        files = sorted(files, key=lambda f: os.path.getmtime(f))
+        signals = [f for f in files if "signals" in f]
+        if len(signals) == 0:
+            print("没有找到signals文件！")
+            time.sleep(3)
+            return
+
+        signalfile, pm_out = os.path.join(SIGNAL_DIR, signals[-1]), os.path.join(PM_DIR, pms[-1])
+        outfile = "{}_{}.txt".format(OUTPUT_FILENAME[:-4], datetime.now().strftime("%m%d_%H:%M:%S"))
+
+    elif mode == 2:
         datadir = input("数据文件夹: ")
         datadir = "data/{}".format(datadir.strip("/"))
+
         files = os.listdir(datadir)
-        files.remove("signals.txt")
+        files = sorted(files, key=lambda f: os.path.getmtime(os.path.join(datadir, f)))
         if "output.txt" in files:
             files.remove("output.txt")
 
-        pm_out = "{}/{}".format(datadir, files[-1])
-        print(pm_out, files)
-        signalfile = "{}/signals.txt".format(datadir)
+        signals = [f for f in files if "signals" in f and "swp" not in f]
+        if len(signals) == 0:
+            print("没有找到signals文件！")
+            time.sleep(3)
+            return
+
+        pms = [f for f in files if "signals" not in f and "output" not in f and "txt" in f]
+        if len(pms) == 0:
+            print("没有找到功率计文件！")
+            time.sleep(3)
+            return
+
+        signalfile, pm_out = os.path.join(datadir, signals[-1]), os.path.join(datadir, pms[-1])
         outfile = "{}/{}".format(datadir, OUTPUT_FILENAME)
 
-        tss = ts_from_recorded_signals(signalfile)
-        f = open(outfile, 'a+')
-        for i, ts in enumerate(tss):
-            res = sampling(ts, pm_out, i)
-            f.write("{}\n".format(res))
-            if i % 100 == 0:
-                log("提取数据: {}".format(i))
-        f.close()
-
-    elif mode == 2:
+    elif mode == 3:
         signalfile = filename_required("signals.txt", "散斑信号文件(默认signals.txt)")
         pm_out = filename_required("sample.txt", "功率计文件(默认sample.txt)")
-
-        f = open(OUTPUT_FILENAME, 'a+')
-        tss = ts_from_recorded_signals(signalfile)
-        for i, ts in enumerate(tss):
-            res = sampling(ts, pm_out, i)
-            f.write("{}\n".format(res))
-        f.close()
+        outfile = "{}_{}.txt".format(OUTPUT_FILENAME[:-4], datetime.now().strftime("%m%d_%H:%M:%S"))
 
     else:
         print("无效指令")
-        exit()
+        time.sleep(3)
+        return
+
+    info("时间信号文件: {}".format(signalfile))
+    info("功率计文件: {}".format(pm_out))
+    info("输出文件: {}".format(outfile))
+    print("")
+
+    tss = ts_from_recorded_signals(signalfile)
+    out = extract(pm_out, tss)
+    f = open(outfile, 'a+')
+    for v in out:
+        f.write("{}\n".format(v))
+    f.close()
 
 
 if __name__ == "__main__":
